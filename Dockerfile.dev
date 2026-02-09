@@ -1,0 +1,29 @@
+FROM node:20
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Rebuild native modules (argon2)
+RUN pnpm rebuild
+
+# Copy prisma schema
+COPY prisma ./prisma/
+RUN pnpm prisma generate
+
+# Copy source code
+COPY . .
+
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
+# Expose port
+EXPOSE 3001
+
+# Start in dev mode with entrypoint
+CMD ["sh", "./entrypoint.sh"]

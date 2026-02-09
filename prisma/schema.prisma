@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  role              UserRole  @default(USER)
+  emailVerifiedAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  sessions           Session[]
+  subscription       Subscription?
+  subscriptionHistory SubscriptionHistory[]
+  onboardingAnswers  OnboardingAnswers?
+  spiritualProfile   SpiritualProfile?
+  chatThreads        ChatThread[]
+  devotionals        Devotional[]
+  aiUsageLogs        AIUsageLog[]
+  usageMetrics       UsageMetrics?
+
+  @@index([email])
+  @@index([role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Session {
+  id                 String    @id @default(uuid())
+  userId             String
+  refreshTokenHash   String
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+  revokedAt          DateTime?
+  ipAddress          String?
+  userAgent          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model BillingPlan {
+  id                String   @id @default(uuid())
+  stripePriceId     String?  @unique
+  stripeProductId   String?
+  name              String   @unique
+  description       String?
+  amount            Int      @default(0)
+  currency          String   @default("BRL")
+  interval          PlanInterval @default(month)
+  features          Json?
+  limits            Json?     // Limites do plano (chatMessagesPerDay, etc)
+  order             Int      @default(0)
+  popular           Boolean  @default(false)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  subscriptions Subscription[]
+  scheduledSubscriptions Subscription[] @relation("ScheduledPlan")
+
+  @@index([active])
+  @@index([order])
+  @@index([name])
+  @@map("billing_plans")
+}
+
+model Subscription {
+  id                    String            @id @default(uuid())
+  userId                String            @unique
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?           @unique
+  planId                String
+  status                SubscriptionStatus
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean           @default(false)
+  canceledAt            DateTime?
+  
+  // Upgrade/Downgrade
+  scheduledPlanId       String?           // Plano agendado (para downgrade)
+  scheduledChangeAt     DateTime?         // Data da mudança agendada
+  
+  // Trial
+  trialEndsAt           DateTime?
+  
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan BillingPlan @relation(fields: [planId], references: [id])
+  scheduledPlan BillingPlan? @relation("ScheduledPlan", fields: [scheduledPlanId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+  @@index([scheduledChangeAt])
+  @@map("subscriptions")
+}
+
+model SubscriptionHistory {
+  id              String   @id @default(uuid())
+  userId          String
+  planId          String
+  action          String   // 'created', 'upgraded', 'downgraded', 'canceled', 'renewed'
+  fromPlanId      String?
+  toPlanId        String?
+  amount          Int?     // Valor pago
+  currency        String?
+  
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("subscription_history")
+}
+
+model UsageMetrics {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  
+  // Chat
+  chatMessagesToday       Int      @default(0)
+  chatMessagesTotal       Int      @default(0)
+  chatLastResetAt         DateTime @default(now())
+  
+  // Devocional
+  devotionalsThisWeek     Int      @default(0)
+  regenerationsToday      Int      @default(0)
+  regenerationsThisWeek   Int      @default(0)
+  devotionalLastResetAt   DateTime @default(now())
+  
+  // Leitura
+  chaptersReadTotal       Int      @default(0)
+  
+  // Última atualização
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([chatLastResetAt])
+  @@map("usage_metrics")
+}
+
+model OnboardingAnswers {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  answers   Json
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("onboarding_answers")
+}
+
+model SpiritualProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  profile   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("spiritual_profiles")
+}
+
+model ChatThread {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String   @default("Nova conversa")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id          String    @id @default(uuid())
+  threadId    String
+  role        MessageRole
+  content     String
+  references  String[]
+  tokensUsed  Int?
+  provider    String?
+  model       String?
+  createdAt   DateTime  @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+model Devotional {
+  id              String    @id @default(uuid())
+  userId          String
+  date            DateTime  @db.Date
+  title           String
+  reflection      String
+  application     String
+  prayer          String
+  reference       String
+  isRegenerated   Boolean   @default(false)
+  theme           String?   // Tema do devocional (para busca/filtro)
+  tokensUsed      Int?
+  provider        String?
+  model           String?
+  createdAt       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, isRegenerated])
+  @@index([userId])
+  @@index([userId, date])
+  @@index([date])
+  @@index([theme])
+  @@map("devotionals")
+}
+
+model AIUsageLog {
+  id            String    @id @default(uuid())
+  userId        String?
+  provider      String
+  model         String
+  tokensInput   Int
+  tokensOutput  Int
+  costUsd       Decimal   @db.Decimal(10, 6)
+  endpoint      String
+  requestId     String?
+  createdAt     DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([provider])
+  @@map("ai_usage_logs")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PlanInterval {
+  month
+  year
+}
+
+enum SubscriptionStatus {
+  inactive
+  active
+  past_due
+  canceled
+  trialing
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
