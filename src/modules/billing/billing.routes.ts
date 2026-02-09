@@ -106,7 +106,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      customer: customerId || undefined,
       line_items: [
         {
           price: plan.stripePriceId,

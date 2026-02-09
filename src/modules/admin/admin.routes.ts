@@ -57,23 +57,21 @@ export async function adminRoutes(app: FastifyInstance) {
           currentPeriodEnd: { gt: new Date() },
         },
       }),
-      app.prisma.subscription.aggregate({
+      app.prisma.subscription.findMany({
         where: { status: 'active' },
-        _sum: {
-          plan: {
-            select: { amount: true },
-          },
-        },
+        include: { plan: true },
       }),
       app.prisma.aIUsageLog.aggregate({
         _sum: { costUsd: true },
       }),
     ]);
 
+    const mrr = totalRevenue.reduce((sum, sub) => sum + (sub.plan?.amount || 0), 0);
+
     return {
       totalUsers,
       activeSubscriptions,
-      mrr: totalRevenue._sum || 0,
+      mrr,
       aiCost: aiUsage._sum?.costUsd || 0,
     };
   });
