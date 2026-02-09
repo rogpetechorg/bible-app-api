@@ -7,11 +7,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
 });
 
-// Helper to convert null to undefined for Stripe API
-const nullToUndefined = <T>(value: T | null): T | undefined => {
-  return value === null ? undefined : value;
-};
-
 const checkoutSchema = z.object({
   planId: z.string(),
   successUrl: z.string().url(),
@@ -92,10 +87,16 @@ export async function billingRoutes(app: FastifyInstance) {
       where: { userId },
     });
 
-    // Convert null to undefined for Stripe API compatibility
-    let customerId = nullToUndefined(subscription?.stripeCustomerId);
+    // Get existing customer ID or create new one
+    const existingCustomerId = subscription?.stripeCustomerId;
 
-    if (!customerId) {
+    let customerId: string;
+
+    if (typeof existingCustomerId === 'string') {
+      // Type narrowing: sabemos que é string aqui
+      customerId = existingCustomerId;
+    } else {
+      // Criar novo customer se não existir
       const user = await app.prisma.user.findUnique({
         where: { id: userId },
       });
