@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { AIRouter } from '../../services/ai/ai-service';
+import { AIRouter } from '../../services/ai/ai-service.js';
 
 const createThreadSchema = z.object({
   title: z.string().optional(),
