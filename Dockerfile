@@ -44,8 +44,9 @@ COPY prisma ./prisma
 # Install production dependencies only
 RUN pnpm install --prod
 
-# Generate Prisma client
-RUN pnpm prisma generate
+# Copy generated Prisma client from builder
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
