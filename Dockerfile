@@ -1,62 +1,53 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Dockerfile simplificado para Easypanel
+FROM node:20-slim AS base
+
+# Instalar OpenSSL para Prisma
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Habilitar pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package files
-COPY package.json ./
+# ===== BUILDER =====
+FROM base AS builder
 
-# Copy prisma schema
-COPY prisma ./prisma
+# Copiar arquivos de dependências
+COPY package.json pnpm-lock.yaml* ./
 
-# Install all dependencies (will create lockfile if needed)
-RUN pnpm install --no-frozen-lockfile
+# Instalar dependências
+RUN pnpm install --frozen-lockfile
 
-# Generate Prisma client
-RUN pnpm prisma generate
-
-# Copy source code
+# Copiar código fonte
 COPY . .
 
-# Build TypeScript
-RUN pnpm build
+# Gerar Prisma Client e build
+RUN pnpm prisma generate && pnpm build
 
-# Production stage
-FROM node:20-alpine
+# ===== PRODUCTION =====
+FROM base AS production
 
-WORKDIR /app
+# Copiar package files
+COPY package.json pnpm-lock.yaml* ./
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+# Instalar apenas dependências de produção
+RUN pnpm install --prod --frozen-lockfile
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy package files
-COPY package.json ./
-
-# Copy prisma schema
+# Copiar prisma schema
 COPY prisma ./prisma
 
-# Install production dependencies only
-RUN pnpm install --prod
+# Gerar Prisma Client
+RUN pnpm prisma generate
 
-# Copy generated Prisma client from builder
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
-
-# Copy built application from builder
+# Copiar código compilado
 COPY --from=builder /app/dist ./dist
 
-# Expose application port
+# Expor porta
 EXPOSE 3001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start the application
+# Start
 CMD ["node", "dist/server.js"]

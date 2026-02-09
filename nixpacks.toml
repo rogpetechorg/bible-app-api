@@ -1,0 +1,22 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = [
+  "corepack enable",
+  "corepack prepare pnpm@latest --activate",
+  "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  "pnpm prisma generate",
+  "pnpm build"
+]
+
+[start]
+cmd = "node dist/server.js"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3001"
