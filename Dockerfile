@@ -1,5 +1,5 @@
 # Production Dockerfile
-FROM node:20-slim AS base
+FROM node:20-slim
 
 # Install OpenSSL for Prisma
 RUN apt-get update -y && \
@@ -11,47 +11,25 @@ WORKDIR /app
 # Enable corepack
 RUN corepack enable
 
-# ===== DEPENDENCIES =====
-FROM base AS deps
-
 # Copy package files
-COPY package.json ./
-COPY pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 
-# Install ALL dependencies
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# ===== BUILDER =====
-FROM base AS builder
-
-# Copy node_modules from deps
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy package and source
-COPY package.json pnpm-lock.yaml ./
+# Copy source
 COPY prisma ./prisma
 COPY src ./src
 COPY tsconfig.json ./
 
-# Generate Prisma and build
+# Generate Prisma Client
 RUN pnpm prisma generate
+
+# Build TypeScript
 RUN pnpm build
 
-# ===== PRODUCTION =====
-FROM base AS runner
-
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install production dependencies
-RUN pnpm install --prod --frozen-lockfile
-
-# Copy prisma and generate
-COPY prisma ./prisma
-RUN pnpm prisma generate
-
-# Copy built app
-COPY --from=builder /app/dist ./dist
+# Remove dev dependencies
+RUN pnpm prune --prod
 
 # Environment
 ENV NODE_ENV=production
