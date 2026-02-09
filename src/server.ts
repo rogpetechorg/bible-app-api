@@ -105,7 +105,7 @@ async function start() {
   try {
     const app = await buildApp();
     const port = parseInt(process.env.PORT || '3001');
-    
+
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`🚀 API running on http://localhost:${port}`);
   } catch (err) {
@@ -114,4 +114,7 @@ async function start() {
   }
 }
 
-start();
+// Only run if this file is executed directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  start();
+}
