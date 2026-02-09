@@ -33,3 +33,7 @@ prisma/.env
 # Testing
 coverage/
 .nyc_output/
+
+# Archive
+.archive-dockerfiles/
+package-lock.json
