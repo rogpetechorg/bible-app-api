@@ -112,11 +112,10 @@ export async function billingRoutes(app: FastifyInstance) {
     }
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: [
         {
-          price: plan.stripePriceId,
+          price: plan.stripePriceId as unknown as string,
           quantity: 1,
         },
       ],
@@ -130,7 +129,13 @@ export async function billingRoutes(app: FastifyInstance) {
           planId: plan.id,
         },
       },
-    });
+    };
+
+    if (customerId && typeof customerId === 'string') {
+      sessionParams.customer = customerId as unknown as string;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     return {
       checkoutUrl: session.url,
