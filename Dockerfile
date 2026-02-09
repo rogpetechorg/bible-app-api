@@ -9,14 +9,11 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json ./
 
-# Create pnpm-lock.yaml if it doesn't exist
-RUN pnpm install --lockfile-only || true
-
 # Copy prisma schema
 COPY prisma ./prisma
 
-# Install all dependencies
-RUN pnpm install
+# Install all dependencies (will create lockfile if needed)
+RUN pnpm install --no-frozen-lockfile
 
 # Generate Prisma client
 RUN pnpm prisma generate
@@ -45,8 +42,8 @@ COPY prisma ./prisma
 RUN pnpm install --prod
 
 # Copy generated Prisma client from builder
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
