@@ -83,11 +83,12 @@ export async function billingRoutes(app: FastifyInstance) {
     }
 
     // Get or create Stripe customer
-    let subscription = await app.prisma.subscription.findFirst({
+    const subscription = await app.prisma.subscription.findFirst({
       where: { userId },
     });
 
-    let customerId: string | undefined = subscription?.stripeCustomerId || undefined;
+    // Convert null to undefined for Stripe API compatibility
+    let customerId = subscription?.stripeCustomerId;
 
     if (!customerId) {
       const user = await app.prisma.user.findUnique({
@@ -106,7 +107,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      customer: customerId as string,
       line_items: [
         {
           price: plan.stripePriceId,
